@@ -85,7 +85,6 @@ process_input:
 
 parse_command:
     ; Compare input with known commands
-    ; For simplicity, we'll handle "echo" and "cls" commands
     mov cx, 4            ; Length of "echo"
     mov di, input_buffer
     mov si, command_echo
@@ -97,6 +96,12 @@ parse_command:
     mov si, command_cls
     repe cmpsb
     je execute_cls
+
+    mov cx, 8            ; Length of "printmem"
+    mov di, input_buffer
+    mov si, command_printmem
+    repe cmpsb
+    je execute_printmem
 
     ; Handle unknown command
     mov si, newline      ; Newline for invalid command
@@ -138,6 +143,62 @@ execute_cls:
 
     ret
 
+execute_printmem:
+    ; Print memory content from 0x1000 to 0x1100
+    mov cx, 0x0100        ; Number of bytes to print (256 bytes)
+    mov si, 0x1000        ; Start address
+printmem_loop:
+    push cx               ; Save CX
+    call print_mem_address
+    mov cl, [si]          ; Get byte from memory
+    call print_hex_byte   ; Print byte as hex
+    mov al, ' '           ; Space separator
+    call print_char
+    pop cx                ; Restore CX
+    inc si                ; Next byte
+    loop printmem_loop    ; Repeat for next byte
+
+    ; Print newline after memory dump
+    mov al, 0x0A          ; Linefeed
+    int 0x10              ; Print character
+    mov al, 0x0D          ; Carriage return
+    int 0x10              ; Print character
+
+    ret
+
+print_mem_address:
+    ; Print address in hexadecimal format
+    mov ah, 0x0E          ; BIOS Teletype function
+    ; Convert address to hexadecimal string and print
+    ; Assumes address is in SI
+    mov al, [si+1]        ; High byte of address
+    call print_hex_nibble
+    mov al, [si]          ; Low byte of address
+    call print_hex_nibble
+    ret
+
+print_hex_byte:
+    ; Print byte in hexadecimal format
+    mov ah, 0x0E          ; BIOS Teletype function
+    call print_hex_nibble  ; High nibble
+    call print_hex_nibble  ; Low nibble
+    ret
+
+print_hex_nibble:
+    ; Convert AL to hex and print
+    and al, 0x0F          ; Mask to low nibble
+    cmp al, 9
+    jbe hex_digit
+    add al, 'A' - 10      ; Convert to 'A'-'F'
+    jmp done_hex_digit
+
+hex_digit:
+    add al, '0'           ; Convert to '0'-'9'
+
+done_hex_digit:
+    int 0x10              ; Print character
+    ret
+
 print_string:
     ; Print string pointed to by SI
 print_char:
@@ -154,5 +215,6 @@ prompt db 'MyOS> $'
 input_buffer times 128 db 0  ; Buffer for user input
 command_echo db 'echo', 0
 command_cls db 'cls', 0
+command_printmem db 'printmem', 0
 unknown_command db 'Invalid command', 0
 newline db 0x0A, 0x0D, 0
