@@ -63,7 +63,7 @@ process_input:
     mov si, input_buffer  ; Point SI to the start of the input buffer
     call parse_command
 
-    ; Clear the input buffer
+    ; Clear the input buffer by resetting DI and using REP STOSB
     mov di, input_buffer
     mov cx, 128           ; Buffer size
     xor al, al            ; Clear value
