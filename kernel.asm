@@ -17,6 +17,9 @@ START:
     mov di, input_buffer
     mov byte [di], 0      ; Clear input buffer
 
+    ; Set default color (Light Gray on Black)
+    mov byte [current_color], 0x07
+
     ; Main loop
 main_loop:
     ; Wait for key press
@@ -101,7 +104,13 @@ parse_command:
     mov di, input_buffer
     mov si, command_printmem
     repe cmpsb
-    je execute_printmem
+    je save_color_and_execute_printmem
+
+    mov cx, 5            ; Length of "color"
+    mov di, input_buffer
+    mov si, command_color
+    repe cmpsb
+    je execute_color
 
     ; Handle unknown command
     mov si, newline      ; Newline for invalid command
@@ -110,6 +119,21 @@ parse_command:
     call print_string
     mov si, newline      ; Newline for prompt
     call print_string
+    ret
+
+save_color_and_execute_printmem:
+    ; Save current color
+    mov al, [current_color]
+    mov [saved_color], al
+
+    ; Execute printmem
+    call execute_printmem
+
+    ; Restore color
+    mov al, [saved_color]
+    mov [current_color], al
+
+    ; Continue
     ret
 
 execute_echo:
@@ -129,7 +153,7 @@ execute_cls:
     ; Clear screen (80x25 text mode)
     mov ah, 0x06          ; Scroll up function
     mov al, 0x00          ; Clear the entire screen
-    mov bh, 0x07          ; Attribute (light gray on black)
+    mov bh, [current_color]  ; Current attribute (color)
     mov cx, 0x0000        ; Top left corner of screen
     mov dx, 0x184F        ; Bottom right corner of screen (80x25)
     int 0x10              ; BIOS Video Interrupt
@@ -164,6 +188,27 @@ printmem_loop:
     mov al, 0x0D          ; Carriage return
     int 0x10              ; Print character
 
+    ret
+
+execute_color:
+    ; Change text and background color
+    mov si, input_buffer + 6 ; Skip "color " (6 characters)
+    call parse_color_values
+
+    ; Automatically run the cls command after changing the color
+    call execute_cls
+    
+    ret
+
+parse_color_values:
+    ; Parse background and text color values
+    mov al, [si]
+    sub al, '0'            ; Convert ASCII to number
+    shl al, 4              ; Shift left for background
+    mov ah, [si+1]
+    sub ah, '0'            ; Convert ASCII to number
+    or al, ah              ; Combine background and text colors
+    mov [current_color], al
     ret
 
 print_mem_address:
@@ -206,6 +251,7 @@ print_char:
     cmp al, 0             ; Check for null terminator
     je done_printing      ; If end of string, return
     mov ah, 0x0E          ; BIOS Teletype function
+    mov bl, [current_color] ; Use current color attribute
     int 0x10              ; Print character
     jmp print_char        ; Repeat for next character
 done_printing:
@@ -216,5 +262,8 @@ input_buffer times 128 db 0  ; Buffer for user input
 command_echo db 'echo', 0
 command_cls db 'cls', 0
 command_printmem db 'printmem', 0
+command_color db 'color', 0
 unknown_command db 'Invalid command', 0
 newline db 0x0A, 0x0D, 0
+current_color db 0x07       ; Default color (Light Gray on Black)
+saved_color db 0x07         ; Storage for color attribute
