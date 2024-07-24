@@ -113,11 +113,7 @@ parse_command:
     je execute_color
 
     ; Handle unknown command
-    mov si, newline      ; Newline for invalid command
-    call print_string
     mov si, unknown_command
-    call print_string
-    mov si, newline      ; Newline for prompt
     call print_string
     ret
 
