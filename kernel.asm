@@ -1,4 +1,3 @@
-; kernel.asm
 [BITS 16]
 [ORG 0x1000]
 
